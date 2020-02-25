@@ -69,8 +69,13 @@ int main(int argc, char *argv[])
     B = (float *)malloc(n*k*sizeof(float));
     C = (float *)malloc(n*n*sizeof(float));
     C2 = (float *)malloc(n*n*sizeof(float));
-    Part = (float *)malloc((n/p) * k * sizeof(float));
-    Ans = (float *)malloc((n/p) * n * sizeof(float));
+    if (id == p-1){
+        Part = (float *)malloc( ((n/p) +(n%p)) * k * sizeof(float));
+        Ans = (float *)malloc( ((n/p)+(n%p)) * n * sizeof(float));
+    }else{
+        Part = (float *)malloc((n/p) * k * sizeof(float));
+        Ans = (float *)malloc((n/p) * n * sizeof(float));
+    }
 
     if (id == 0){ //PID 0 sets the matrices 
         int i,j;
@@ -87,24 +92,41 @@ int main(int argc, char *argv[])
         }
         wtime = MPI_Wtime();
         for(i=1;i<p;i++){
-            MPI_Isend(A + i*(n/p)*k,(n/p)*k,MPI_FLOAT,i,1,MPI_COMM_WORLD,&req1[i-1]);
+            if (i==p-1){
+                MPI_Isend(A + i*(n/p)*k,((n/p)+(n%p))*k,MPI_FLOAT,i,1,MPI_COMM_WORLD,&req1[i-1]);
+            }else{
+                MPI_Isend(A + i*(n/p)*k,(n/p)*k,MPI_FLOAT,i,1,MPI_COMM_WORLD,&req1[i-1]);
+            }
             MPI_Isend(B,n*k,MPI_FLOAT,i,1,MPI_COMM_WORLD,&req2[i-1]);
         }
         MPI_Waitall(p-1,req1,stat1);
         Matrix_Multiply(A,B,C,(n/p),k,n);
         MPI_Waitall(p-1,req2,stat2);
         for(i=1;i<p;i++){
-            MPI_Irecv(C+(i*(n/p)*n),(n/p)*n,MPI_FLOAT,i,MPI_ANY_TAG,MPI_COMM_WORLD,&req1[i-1]);
+            if (i==p-1){
+                MPI_Irecv(C+(i*(n/p)*n),((n/p)+(n%p))*n,MPI_FLOAT,i,MPI_ANY_TAG,MPI_COMM_WORLD,&req1[i-1]);
+            }else{
+                MPI_Irecv(C+(i*(n/p)*n),(n/p)*n,MPI_FLOAT,i,MPI_ANY_TAG,MPI_COMM_WORLD,&req1[i-1]);
+            }
         }
         MPI_Waitall(p-1,req1,stat1);
         wtime = MPI_Wtime() - wtime;
     }else{
-        MPI_Irecv(Part,(n/p)*k,MPI_FLOAT,0,MPI_ANY_TAG,MPI_COMM_WORLD,&req1[0]);
+        if (id==p-1){
+            MPI_Irecv(Part,((n/p)+(n%p))*k,MPI_FLOAT,0,MPI_ANY_TAG,MPI_COMM_WORLD,&req1[0]);
+        }else{
+            MPI_Irecv(Part,(n/p)*k,MPI_FLOAT,0,MPI_ANY_TAG,MPI_COMM_WORLD,&req1[0]);
+        }
         MPI_Irecv(B,n*k,MPI_FLOAT,0,MPI_ANY_TAG,MPI_COMM_WORLD, &req2[0]);
         MPI_Wait(&req1[0],&stat1[0]);
         MPI_Wait(&req2[0],&stat2[0]);
-        Matrix_Multiply(Part,B,Ans,(n/p),k,n);
-        MPI_Isend(Ans,(n/p)*n,MPI_FLOAT,0,1,MPI_COMM_WORLD,&req1[0]);
+        if (id==p-1){
+            Matrix_Multiply(Part,B,Ans,(n/p)+(n%p),k,n);
+            MPI_Isend(Ans,((n/p)+(n%p))*n,MPI_FLOAT,0,1,MPI_COMM_WORLD,&req1[0]);
+        }else{
+            Matrix_Multiply(Part,B,Ans,(n/p),k,n);
+            MPI_Isend(Ans,(n/p)*n,MPI_FLOAT,0,1,MPI_COMM_WORLD,&req1[0]);
+        }
         MPI_Wait(&req1[0],status);
     }
     if (id == 0){

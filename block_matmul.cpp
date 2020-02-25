@@ -58,8 +58,13 @@ int main(int argc, char *argv[])
     B = (float *)malloc(n*k*sizeof(float));
     C = (float *)malloc(n*n*sizeof(float));
     C2 = (float *)malloc(n*n*sizeof(float));
-    Part = (float *)malloc((n/p) * k * sizeof(float));
-    Ans = (float *)malloc((n/p) * n * sizeof(float));
+    if (id == p-1){
+        Part = (float *)malloc( ((n/p) + (n%p)) * k * sizeof(float));
+        Ans = (float *)malloc( ((n/p)+(n%p)) * n * sizeof(float));
+    }else{
+        Part = (float *)malloc((n/p) * k * sizeof(float));
+        Ans = (float *)malloc((n/p) * n * sizeof(float));
+    }
 
     if (id == 0){ //PID 0 sets the matrices 
         int i,j;
@@ -71,24 +76,40 @@ int main(int argc, char *argv[])
         for (i=0; i<k;i++){
             for(j=0;j<n;j++){
                 B[i*n+j] = ((float)rand()/RAND_MAX);
-
             }
         }
         wtime = MPI_Wtime();
         for(i=1;i<p;i++){
-            MPI_Send(A + i*(n/p)*k,(n/p)*k,MPI_FLOAT,i,1,MPI_COMM_WORLD);
+            if (i==p-1){
+                MPI_Send(A +(p-1)*(n/p)*k,((n/p) + n%p)*k, MPI_FLOAT,i,1,MPI_COMM_WORLD);
+            }else{
+                MPI_Send(A + i*(n/p)*k,(n/p)*k,MPI_FLOAT,i,1,MPI_COMM_WORLD);
+            }
             MPI_Send(B,n*k,MPI_FLOAT,i,1,MPI_COMM_WORLD);
         }
         Matrix_Multiply(A,B,C,(n/p),k,n);
         for(i=1;i<p;i++){
-            MPI_Recv(C+(i*(n/p)*n),(n/p)*n,MPI_FLOAT,i,MPI_ANY_TAG,MPI_COMM_WORLD,status);
+            if (i==p-1){
+                MPI_Recv(C+((p-1)*(n/p)*n),((n/p)+(n%p))*n,MPI_FLOAT,i,MPI_ANY_TAG,MPI_COMM_WORLD,status);
+            }else{
+                MPI_Recv(C+(i*(n/p)*n),(n/p)*n,MPI_FLOAT,i,MPI_ANY_TAG,MPI_COMM_WORLD,status);
+            }
         }
         wtime = MPI_Wtime() - wtime;
     }else{
-        MPI_Recv(Part,(n/p)*k,MPI_FLOAT,0,MPI_ANY_TAG,MPI_COMM_WORLD,status);
+        if (id == p-1){
+            MPI_Recv(Part,((n/p)+(n%p))*k,MPI_FLOAT,0,MPI_ANY_TAG,MPI_COMM_WORLD,status);
+        }else{
+            MPI_Recv(Part,(n/p)*k,MPI_FLOAT,0,MPI_ANY_TAG,MPI_COMM_WORLD,status);
+        }
         MPI_Recv(B,n*k,MPI_FLOAT,0,MPI_ANY_TAG,MPI_COMM_WORLD, status);
-        Matrix_Multiply(Part,B,Ans,(n/p),k,n);
-        MPI_Send(Ans,(n/p)*n,MPI_FLOAT,0,1,MPI_COMM_WORLD);
+        if (id==p-1){
+            Matrix_Multiply(Part,B,Ans,(n/p)+(n%p) ,k,n);
+            MPI_Send(Ans,((n/p)+(n%p))*n,MPI_FLOAT,0,1,MPI_COMM_WORLD);
+        }else{
+            Matrix_Multiply(Part,B,Ans,(n/p),k,n);
+            MPI_Send(Ans,(n/p)*n,MPI_FLOAT,0,1,MPI_COMM_WORLD);
+        }
     }
     if (id == 0){
         auto sertime = high_resolution_clock::now();
