@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     srand(time(0));
     int id;
     int p;
-    int n=1000;
+    int n=8000;
     int k=32;
     int ierr = MPI_Init(&argc, &argv);
 
@@ -134,10 +134,12 @@ int main(int argc, char *argv[])
         Matrix_Multiply(A,B,C2,n,k,n);
         auto st = high_resolution_clock::now();
         auto du = duration_cast<milliseconds>(st-sertime);
-        cout<<"Using MPI: "<<wtime<<endl;
+        cout<<"Using Non-blocking MPI: "<<wtime<<endl;
         cout<<"Using Serial Code: ";
         cout<<((float)du.count())/1000<<endl;
-        cout << IsEqual(C,C2,n,n)<<endl;
+        cout<<"Sanity Check: ";
+        cout <<IsEqual(C,C2,n,n)<<endl;
+        cout<<"-x-x-x-x-x-x-x-"<<endl;
     }
     ierr = MPI_Finalize();
 
